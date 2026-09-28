@@ -57,7 +57,7 @@ async function boot() {
   catch (e) { console.error(e); $('main').innerHTML = `<div class="sheet"><p class="h2">The room couldn't connect.</p><p class="hint" style="margin-top:6px">${esc(e.message || e)}. Check your connection and reload; if it keeps happening, tell the commissioner.</p></div>`; return; }
   S.uid = S.store.uid; if (dev) window.__S = S;
   S.store.subscribeDoc('config', 'app', d => { S.config = d; afterData(); });
-  S.store.subscribe('players', docs => { S.players = {}; for (const d of docs) S.players[d.id] = d; adoptMe(); afterData(); });
+  S.store.subscribe('players', docs => { S.players = {}; for (const d of docs) S.players[d.id] = d; S.playersLoaded = true; adoptMe(); afterData(); });
   S.store.subscribe('lines', docs => { S.lines = {}; for (const d of docs) S.lines[d.id] = d; adoptMyLines(); afterData(); });
   S.store.subscribe('book', docs => { S.book = {}; for (const d of docs) S.book[d.id] = d; afterData(); });
   S.store.subscribe('overrides', docs => { S.overrides = {}; for (const d of docs) S.overrides[d.id] = d; afterData(); });
@@ -136,6 +136,7 @@ function render() {
   if (!S.ready) return;
   renderShell();
   const main = $('main');
+  if (!S.playersLoaded) { main.innerHTML = `<div class="sheet"><p class="hint"><span class="spin"></span> Loading the room…</p></div>`; return; }   // never show Join to a returning player before we know who they are
   if (!S.players[S.uid]) { main.innerHTML = renderJoin(); return; }
   if (!S.me) adoptMe();
   const fn = { home: renderHome, rank: renderRank, lines: renderLines, compare: renderCompare, standings: renderStandings, commish: renderCommish }[S.screen] || renderHome;
@@ -144,10 +145,11 @@ function render() {
 
 /* ================= screens ================= */
 function renderJoin() {
+  const typed = $('joinname') ? $('joinname').value : '';   // keep a half-typed name if the screen re-renders
   return `<div class="sheet join"><p class="eyebrow">Welcome</p><h1 class="h1">Pick'em Room</h1>
   <p style="margin:10px 0 6px">A season-long game between friends: rank the teams, set your own line on every game, and score against the real result and the Vegas closing line.</p>
   <ol style="padding-left:20px;margin:8px 0 14px;display:grid;gap:6px">${HOW_TO_PLAY.map(s => `<li>${esc(s)}</li>`).join('')}</ol>
-  <div class="onboard"><label class="hint" for="joinname">What should we call you?</label><input type="text" id="joinname" placeholder="Your first name" maxlength="24" autocomplete="given-name"><button class="btn red wide" data-act="join">Join the room</button><p class="hint">No account needed. Your name and lines are saved to this phone; you can add Google sign-in later to use another device.</p></div></div>`;
+  <div class="onboard"><label class="hint" for="joinname">What should we call you?</label><input type="text" id="joinname" placeholder="Your first name" maxlength="24" autocomplete="given-name" value="${esc(typed)}"><button class="btn red wide" data-act="join">Join the room</button><p class="hint">No account needed. Your name and lines are saved to this phone; you can add Google sign-in later to use another device.</p></div></div>`;
 }
 
 function weekPicker(wk) { const p = prevWeekKey(wk), n = nextWeekKey(wk); return `<div class="wkpick"><button data-act="wk" data-wk="${p || ''}" ${p ? '' : 'disabled'} aria-label="Previous week">‹</button><b>${weekLabel(wk)}</b><button data-act="wk" data-wk="${n || ''}" ${n ? '' : 'disabled'} aria-label="Next week">›</button>${wk !== S.week ? `<button class="mini" data-act="wk" data-wk="${S.week}">this week</button>` : ''}</div>`; }
@@ -349,6 +351,7 @@ M.addEventListener('drop', e => { const row = e.target.closest('.trow'); if (!ro
 M.addEventListener('dragend', () => { drag = null; document.querySelectorAll('.dragging,.over').forEach(x => x.classList.remove('dragging', 'over')); });
 
 async function joinRoom(name) {
+  if (S.players[S.uid]) { location.hash = 'home'; render(); return; }   // already a player on this device: never overwrite
   const now = nowISO(); const ord = allGames().length ? standingsOrder(allGames()) : ALL.slice();
   const doc = { name, joinedAt: now, active: true, order: ord, orderUpdatedAt: null, updatedAt: now, linked: false };
   await S.store.set('players', S.uid, doc);
