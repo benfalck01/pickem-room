@@ -48,7 +48,7 @@ const canSeeOthers = g => myLine(g) != null || started(g);
 
 /* ================= boot ================= */
 let renderQueued = false, pendingRender = false;
-function scheduleRender() { if (renderQueued) return; renderQueued = true; requestAnimationFrame(() => { renderQueued = false; const a = document.activeElement; if (a && a.matches('input,textarea') && a.closest('#main')) { pendingRender = true; return; } render(); }); }
+function scheduleRender() { if (renderQueued) return; renderQueued = true; setTimeout(() => { renderQueued = false; const a = document.activeElement; if (a && a.matches('input,textarea') && a.closest('#main')) { pendingRender = true; return; } render(); }, 0); }   // a timer, not requestAnimationFrame: background tabs pause animation frames but still get live updates
 document.addEventListener('focusout', () => { if (pendingRender) { pendingRender = false; setTimeout(render, 60); } });
 
 async function boot() {
