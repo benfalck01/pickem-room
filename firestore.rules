@@ -1,0 +1,47 @@
+rules_version = '2';
+// Pick'em Room security rules. Paste into Firebase console → Firestore Database → Rules → Publish.
+// Everyone who opens the link is signed in anonymously (no account). Each player can only write their own
+// player document and their own lines. The commissioner (the first person to open the page) can write everything.
+service cloud.firestore {
+  match /databases/{db}/documents {
+    function signedIn() { return request.auth != null; }
+    function isCommish() {
+      return signedIn() && exists(/databases/$(db)/documents/config/app)
+        && get(/databases/$(db)/documents/config/app).data.commissionerUid == request.auth.uid;
+    }
+
+    match /config/app {
+      allow read: if signedIn();
+      // first visitor claims the commissioner seat; after that only the commissioner may change config
+      allow create: if signedIn() && request.resource.data.commissionerUid == request.auth.uid;
+      allow update: if isCommish();
+    }
+
+    match /players/{uid} {
+      allow read: if signedIn();
+      allow create, update: if signedIn() && (request.auth.uid == uid || isCommish());
+      allow delete: if isCommish();
+    }
+
+    match /lines/{docId} {
+      allow read: if signedIn();
+      allow create, update: if signedIn() && (
+        (request.resource.data.uid == request.auth.uid && docId == request.auth.uid + '_' + request.resource.data.wk)
+        || isCommish());
+      allow delete: if isCommish();
+    }
+
+    // the book's closing line, written once by whichever phone first sees it after kickoff
+    match /book/{gameId} {
+      allow read: if signedIn();
+      allow create: if signedIn();
+      allow update, delete: if isCommish();
+    }
+
+    // commissioner corrections (scores, closing lines)
+    match /overrides/{gameId} {
+      allow read: if signedIn();
+      allow write: if isCommish();
+    }
+  }
+}
