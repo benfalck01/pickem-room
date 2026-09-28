@@ -33,6 +33,7 @@ class LocalStore {
   _save(db) { localStorage.setItem('pickem.dev.db', JSON.stringify(db)); if (this.chan) this.chan.postMessage('change'); this._notify(); }
   _notify() { const db = this._db(); for (const s of this.subs) s.cb(Object.entries(db[s.coll] || {}).map(([id, d]) => ({ id, ...d }))); }
   subscribe(coll, cb) { const s = { coll, cb }; this.subs.push(s); setTimeout(() => this._notify(), 0); return () => { this.subs = this.subs.filter(x => x !== s); }; }
+  subscribeDoc(coll, id, cb) { return this.subscribe(coll, docs => cb(docs.find(d => d.id === id) || null)); }
   async get(coll, id) { const d = (this._db()[coll] || {})[id]; return d ? { id, ...d } : null; }
   async set(coll, id, data) { const db = this._db(); (db[coll] = db[coll] || {})[id] = strip(data); this._save(db); }
   async update(coll, id, patch) { const db = this._db(); const c = db[coll] = db[coll] || {}; c[id] = { ...(c[id] || {}), ...strip(patch) }; this._save(db); }
@@ -64,6 +65,11 @@ class FirebaseStore {
   subscribe(coll, cb, onError) {
     const { collection, onSnapshot } = this.F;
     return onSnapshot(collection(this.db, coll), snap => cb(snap.docs.map(d => ({ id: d.id, ...d.data() }))), err => { console.warn('subscribe', coll, err); if (onError) onError(err); });
+  }
+  /** One document, live. Used for config/app, whose rules are per-document (a collection listen would be refused). */
+  subscribeDoc(coll, id, cb, onError) {
+    const { doc, onSnapshot } = this.F;
+    return onSnapshot(doc(this.db, coll, id), snap => cb(snap.exists() ? { id: snap.id, ...snap.data() } : null), err => { console.warn('subscribeDoc', coll, id, err); if (onError) onError(err); });
   }
   async get(coll, id) { const { doc, getDoc } = this.F; const s = await getDoc(doc(this.db, coll, id)); return s.exists() ? { id: s.id, ...s.data() } : null; }
   async set(coll, id, data) { const { doc, setDoc } = this.F; await setDoc(doc(this.db, coll, id), strip(data)); }

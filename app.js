@@ -56,7 +56,7 @@ async function boot() {
   try { S.store = await createStore({ firebaseConfig: FIREBASE_CONFIG, dev }); }
   catch (e) { console.error(e); $('main').innerHTML = `<div class="sheet"><p class="h2">The room couldn't connect.</p><p class="hint" style="margin-top:6px">${esc(e.message || e)}. Check your connection and reload; if it keeps happening, tell the commissioner.</p></div>`; return; }
   S.uid = S.store.uid; if (dev) window.__S = S;
-  S.store.subscribe('config', docs => { S.config = docs.find(d => d.id === 'app') || null; afterData(); });
+  S.store.subscribeDoc('config', 'app', d => { S.config = d; afterData(); });
   S.store.subscribe('players', docs => { S.players = {}; for (const d of docs) S.players[d.id] = d; adoptMe(); afterData(); });
   S.store.subscribe('lines', docs => { S.lines = {}; for (const d of docs) S.lines[d.id] = d; adoptMyLines(); afterData(); });
   S.store.subscribe('book', docs => { S.book = {}; for (const d of docs) S.book[d.id] = d; afterData(); });
