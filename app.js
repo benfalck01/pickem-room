@@ -1,8 +1,8 @@
 // Pick'em Room — app logic (phone-first, shared live state).
-import { scoreLine, bookSelfScore, RULES, HOW_TO_PLAY } from './scoring.js?v=202610122222';
-import { TEAMS, T, ALL, DIVS, WEEK_KEYS, weekLabel, weekShort, nextWeekKey, prevWeekKey, fetchCurrent, fetchWeek, fetchBook, clearCache, records, recStr, standingsOrder } from './nfl.js?v=202610122222';
-import { createStore } from './store.js?v=202610122222';
-import { FIREBASE_CONFIG } from './firebase-config.js?v=202610122222';
+import { scoreLine, bookSelfScore, RULES, HOW_TO_PLAY } from './scoring.js?v=202610122227';
+import { TEAMS, T, ALL, DIVS, WEEK_KEYS, weekLabel, weekShort, nextWeekKey, prevWeekKey, fetchCurrent, fetchWeek, fetchBook, clearCache, records, recStr, standingsOrder } from './nfl.js?v=202610122227';
+import { createStore } from './store.js?v=202610122227';
+import { FIREBASE_CONFIG } from './firebase-config.js?v=202610122227';
 
 /* ================= state ================= */
 const S = { store: null, uid: null, config: null, players: {}, lines: {}, book: {}, overrides: {}, games: {}, current: { key: null, year: null }, week: null, viewWeek: null, me: null, myLines: {}, screen: 'home', ready: false, netErr: null, cmpWho: null, showAllRanks: false, rankMode: 'div', bookTried: new Set() };

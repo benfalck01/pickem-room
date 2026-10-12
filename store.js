@@ -58,11 +58,18 @@ class FirebaseStore {
     this.A = auth; this.F = fs;
     const app = initializeApp(this.config);
     this.auth = auth.getAuth(app); this.db = fs.getFirestore(app);
+    // Wait for the persisted sign-in first; only create an anonymous identity when there is none.
+    // (Calling signInAnonymously unconditionally replaces a Google-linked player with a fresh anonymous one.)
     const user = await new Promise((resolve, reject) => {
-      const stop = auth.onAuthStateChanged(this.auth, u => { if (u) { stop(); resolve(u); } }, reject);
-      auth.signInAnonymously(this.auth).catch(reject);
+      let done = false;
+      const stop = auth.onAuthStateChanged(this.auth, u => {
+        if (done) return; done = true; stop();
+        if (u) resolve(u); else auth.signInAnonymously(this.auth).then(c => resolve(c.user)).catch(reject);
+      }, e => { if (!done) { done = true; reject(e); } });
     });
     this.uid = user.uid; this.isAnonymous = user.isAnonymous; this.email = user.email || null;
+    // if the signed-in player changes underneath the page (another tab signed in or out), start over cleanly
+    auth.onAuthStateChanged(this.auth, u => { if (u && u.uid !== this.uid) location.reload(); });
   }
   subscribe(coll, cb, onError) {
     const { collection, onSnapshot } = this.F;
