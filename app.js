@@ -1,8 +1,8 @@
 // Pick'em Room — app logic (phone-first, shared live state).
-import { scoreLine, bookSelfScore, RULES, HOW_TO_PLAY } from './scoring.js?v=202610121947';
-import { TEAMS, T, ALL, DIVS, WEEK_KEYS, weekLabel, weekShort, nextWeekKey, prevWeekKey, fetchCurrent, fetchWeek, fetchBook, clearCache, records, recStr, standingsOrder } from './nfl.js?v=202610121947';
-import { createStore } from './store.js?v=202610121947';
-import { FIREBASE_CONFIG } from './firebase-config.js?v=202610121947';
+import { scoreLine, bookSelfScore, RULES, HOW_TO_PLAY } from './scoring.js?v=202610121948';
+import { TEAMS, T, ALL, DIVS, WEEK_KEYS, weekLabel, weekShort, nextWeekKey, prevWeekKey, fetchCurrent, fetchWeek, fetchBook, clearCache, records, recStr, standingsOrder } from './nfl.js?v=202610121948';
+import { createStore } from './store.js?v=202610121948';
+import { FIREBASE_CONFIG } from './firebase-config.js?v=202610121948';
 
 /* ================= state ================= */
 const S = { store: null, uid: null, config: null, players: {}, lines: {}, book: {}, overrides: {}, games: {}, current: { key: null, year: null }, week: null, viewWeek: null, me: null, myLines: {}, screen: 'home', ready: false, netErr: null, cmpWho: null, showAllRanks: false, rankMode: 'div', bookTried: new Set() };
@@ -153,9 +153,6 @@ function render() {
 /* ================= screens ================= */
 function renderJoin() {
   const typed = $('joinname') ? $('joinname').value : '';   // keep a half-typed name if the screen re-renders
-  return `<div class="sheet join"><p class="eyebrow">Welcome</p><h1 class="h1">Pick'em Room</h1>
-  <p style="margin:10px 0 6px">A season-long game between friends: rank the teams, set your own line on every game, and score against the real result and the Vegas closing line.</p>
-  <ol style="padding-left:20px;margin:8px 0 14px;display:grid;gap:6px">${HOW_TO_PLAY.map(s => `<li>${esc(s)}</li>`).join('')}</ol>
   const google = S.store.isDev ? '' : S.store.isAnonymous === false
     ? `<div class="okbox">Signed in with Google. Pick a name and your player will work on every device.</div>`
     : `<div class="card soft"><b>Already playing on another phone?</b><p class="hint" style="margin:4px 0 8px">Tap below and choose the Google account you added there. You'll land on your own player.</p><button class="btn wide" data-act="joingoogle">Continue with Google</button></div><p class="hint" style="text-align:center">or start fresh on this device</p>`;
