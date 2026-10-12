@@ -39,6 +39,8 @@ class LocalStore {
   async update(coll, id, patch) { const db = this._db(); const c = db[coll] = db[coll] || {}; c[id] = { ...(c[id] || {}), ...strip(patch) }; this._save(db); }
   async remove(coll, id) { const db = this._db(); if (db[coll]) delete db[coll][id]; this._save(db); }
   async linkGoogle() { throw new Error('Not available in dev mode'); }
+  async signInGoogle() { throw new Error('Not available in dev mode'); }
+  currentUid() { return this.uid; }
   resetAll() { localStorage.removeItem('pickem.dev.db'); if (this.chan) this.chan.postMessage('change'); this._notify(); }
 }
 function strip(o) { return JSON.parse(JSON.stringify(o)); }
@@ -75,6 +77,16 @@ class FirebaseStore {
   async set(coll, id, data) { const { doc, setDoc } = this.F; await setDoc(doc(this.db, coll, id), strip(data)); }
   async update(coll, id, patch) { const { doc, setDoc } = this.F; await setDoc(doc(this.db, coll, id), strip(patch), { merge: true }); }
   async remove(coll, id) { const { doc, deleteDoc } = this.F; await deleteDoc(doc(this.db, coll, id)); }
+  /** The uid Firebase currently holds for this tab (can differ from the page's uid after a Google sign-in). */
+  currentUid() { return this.auth.currentUser ? this.auth.currentUser.uid : null; }
+  /** Sign in with Google from the welcome screen. If that Google account already backs a player (linked on another
+   *  device), this tab becomes that player; otherwise it is a fresh Google-backed user who then picks a name. */
+  async signInGoogle() {
+    const { GoogleAuthProvider, signInWithPopup } = this.A;
+    const provider = new GoogleAuthProvider(); provider.setCustomParameters({ prompt: 'select_account' });
+    const r = await signInWithPopup(this.auth, provider);
+    return { uid: r.user.uid, changed: r.user.uid !== this.uid };
+  }
   /** Link this device's anonymous player to a Google account so it can be used on other devices. */
   async linkGoogle() {
     const { GoogleAuthProvider, linkWithPopup, signInWithCredential } = this.A;
