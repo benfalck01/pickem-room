@@ -1,8 +1,8 @@
 // Pick'em Room — app logic (phone-first, shared live state).
-import { scoreLine, bookSelfScore, RULES, HOW_TO_PLAY } from './scoring.js?v=202610122211';
-import { TEAMS, T, ALL, DIVS, WEEK_KEYS, weekLabel, weekShort, nextWeekKey, prevWeekKey, fetchCurrent, fetchWeek, fetchBook, clearCache, records, recStr, standingsOrder } from './nfl.js?v=202610122211';
-import { createStore } from './store.js?v=202610122211';
-import { FIREBASE_CONFIG } from './firebase-config.js?v=202610122211';
+import { scoreLine, bookSelfScore, RULES, HOW_TO_PLAY } from './scoring.js?v=202610122222';
+import { TEAMS, T, ALL, DIVS, WEEK_KEYS, weekLabel, weekShort, nextWeekKey, prevWeekKey, fetchCurrent, fetchWeek, fetchBook, clearCache, records, recStr, standingsOrder } from './nfl.js?v=202610122222';
+import { createStore } from './store.js?v=202610122222';
+import { FIREBASE_CONFIG } from './firebase-config.js?v=202610122222';
 
 /* ================= state ================= */
 const S = { store: null, uid: null, config: null, players: {}, lines: {}, book: {}, overrides: {}, games: {}, current: { key: null, year: null }, week: null, viewWeek: null, me: null, myLines: {}, screen: 'home', ready: false, netErr: null, cmpWho: null, showAllRanks: false, rankMode: 'div', bookTried: new Set() };
@@ -34,7 +34,7 @@ const allGames = () => Object.values(S.games).flat();
 const gamesOf = wk => S.games[wk] || [];
 function resultOf(g) { const o = S.overrides[g.id]; if (o && o.homeScore != null && o.awayScore != null) return { homeScore: Number(o.homeScore), awayScore: Number(o.awayScore), final: true, corrected: true }; if (g.state === 'post' && g.homeScore != null) return { homeScore: g.homeScore, awayScore: g.awayScore, final: true, corrected: false }; return null; }
 function closeOf(g) { const o = S.overrides[g.id]; if (o && o.close != null) return Number(o.close); const b = S.book[g.id]; return b && b.close != null ? Number(b.close) : null; }
-const activePlayers = () => Object.values(S.players).filter(p => p.active !== false).sort((a, b) => (a.joinedAt || '').localeCompare(b.joinedAt || ''));
+const activePlayers = () => Object.values(S.players).filter(p => p.active !== false && !p.removed).sort((a, b) => (a.joinedAt || '').localeCompare(b.joinedAt || ''));
 const others = () => activePlayers().filter(p => p.id !== S.uid);
 const isCommish = () => !!(S.config && S.config.commissionerUid === S.uid);
 const penOf = uid => uid === S.uid ? 'var(--red)' : PENS[Math.max(0, others().findIndex(p => p.id === uid)) % PENS.length];
@@ -164,8 +164,8 @@ function renderJoin() {
   <ol style="padding-left:20px;margin:8px 0 14px;display:grid;gap:6px">${HOW_TO_PLAY.map(s => `<li>${esc(s)}</li>`).join('')}</ol>
   <div class="onboard">${google}<label class="hint" for="joinname">What should we call you?</label><input type="text" id="joinname" placeholder="Your first name" maxlength="24" autocomplete="given-name" value="${esc(typed)}"><button class="btn red wide" data-act="join">Join the room</button><p class="hint">${S.store.isAnonymous === false ? 'Google keeps you signed in on this device.' : 'No account needed. Your player is saved to this device; add Google sign-in later (under your name, top right) to use it on another one.'}</p></div></div>`;
 }
-function commishFail(e) { const msg = commishErr(e); flash(msg); if (/commissioner/.test(msg)) setTimeout(() => openModal(meModal()), 1200); }   // show the Google switch right away
-function commishErr(e) { const c = (e && (e.code || e.message)) || 'unknown'; return /permission/i.test(c) ? "This device isn't your commissioner player. Tap Sign in with Google instead (below) and pick the Google account from your phone." : /network|unavailable/i.test(c) ? 'No connection. Try again in a moment.' : `That didn't save (${c}).`; }
+function commishFail(e) { const msg = commishErr(e); flash(msg); if (/Sign in with Google instead/.test(msg)) setTimeout(() => openModal(meModal()), 1200); }   // show the Google switch only when the device really isn't the commissioner
+function commishErr(e) { const c = (e && (e.code || e.message)) || 'unknown'; return /permission/i.test(c) ? (isCommish() ? "The database refused that change even though you're the commissioner. Tell Claude: permission-denied on a commissioner action." : "This device isn't your commissioner player. Tap Sign in with Google instead (below) and pick the Google account from your phone.") : /network|unavailable/i.test(c) ? 'No connection. Try again in a moment.' : `That didn't save (${c}).`; }
 function googleErr(err) { const c = (err && err.code) || ''; return c === 'auth/popup-blocked' ? 'Your browser blocked the sign-in window. Allow pop-ups for this site and try again.' : c === 'auth/popup-closed-by-user' || c === 'auth/cancelled-popup-request' ? 'The sign-in window was closed before finishing.' : c === 'auth/operation-not-allowed' ? "Google sign-in isn't switched on for this room yet. Tell the commissioner." : c === 'auth/unauthorized-domain' ? "This address isn't authorized for Google sign-in yet. Tell the commissioner." : c === 'auth/network-request-failed' ? 'No connection. Try again in a moment.' : `Google sign-in failed (${c || (err && err.message) || 'unknown'}).`; }
 
 function weekPicker(wk) { const p = prevWeekKey(wk), n = nextWeekKey(wk); return `<div class="wkpick"><button data-act="wk" data-wk="${p || ''}" ${p ? '' : 'disabled'} aria-label="Previous week">‹</button><b>${weekLabel(wk)}</b><button data-act="wk" data-wk="${n || ''}" ${n ? '' : 'disabled'} aria-label="Next week">›</button>${wk !== S.week ? `<button class="mini" data-act="wk" data-wk="${S.week}">this week</button>` : ''}</div>`; }
@@ -283,7 +283,7 @@ function renderStandings() {
 
 function renderCommish() {
   if (!isCommish()) return `<div class="sheet"><p class="hint">Only the commissioner can see this.</p></div>`;
-  const wk = S.viewWeek; const gs = gamesOf(wk); const ps = Object.values(S.players).sort((a, b) => (a.joinedAt || '').localeCompare(b.joinedAt || ''));
+  const wk = S.viewWeek; const gs = gamesOf(wk); const ps = Object.values(S.players).filter(p => !p.removed).sort((a, b) => (a.joinedAt || '').localeCompare(b.joinedAt || ''));
   const weekOpts = `<option value="">Automatic (ESPN says ${weekLabel(S.current.key)})</option>` + WEEK_KEYS.map(k => `<option value="${k}" ${S.config.weekOverride === k ? 'selected' : ''}>${weekLabel(k)}</option>`).join('');
   const diag = S.commishCheck ? (S.commishCheck.ok ? `<div class="okbox">Commissioner rights confirmed on this device.</div>` : `<div class="warnbox"><b>The database refused a commissioner write on this device.</b><br>Error: <span class="mono">${esc(S.commishCheck.code)}</span><br>Your sign-in: <span class="mono">${esc(S.uid.slice(0, 8))}…</span> (${S.store.isAnonymous === false ? 'Google' : 'anonymous'}) · commissioner on record: <span class="mono">${esc((S.config.commissionerUid || '').slice(0, 8))}…</span><br>Tell Claude this error.</div>`) : `<div class="hint"><span class="spin"></span> Checking commissioner rights…</div>`;
   if (!S.commishCheck && !S.commishChecking) { S.commishChecking = true; S.store.update('config', 'app', { checkedAt: nowISO() }).then(() => { S.commishCheck = { ok: true }; }).catch(e => { S.commishCheck = { ok: false, code: (e && (e.code || e.message)) || 'unknown' }; }).finally(() => { S.commishChecking = false; if (S.screen === 'commish') render(); }); }
@@ -346,7 +346,11 @@ document.body.addEventListener('click', async e => {
     openModal(`<p class="eyebrow">Merge player</p><h1 class="h1" style="font-size:24px">${esc(p.name)} → ?</h1><p class="hint" style="margin:8px 0">Their lines move to the player you choose (weeks that player already has lines for are kept as they are), then <b>${esc(p.name)}</b> is deleted. This can't be undone.</p><select id="merge-into" style="width:100%">${targets.map(t => `<option value="${t.id}">${esc(t.name)}${t.id === S.uid ? ' (you)' : ''}${t.active === false ? ' (dropped)' : ''}</option>`).join('')}</select><div class="row" style="margin-top:12px"><button class="btn red" data-act="merge-go" data-uid="${p.id}">Merge and delete ${esc(p.name)}</button><button class="btn ghost" data-act="closemodal">Cancel</button></div>`); return; }
   if (act === 'merge-go') { const from = b.dataset.uid, to = $('merge-into').value; if (!from || !to || from === to) return; b.disabled = true; try { await mergePlayers(from, to); closeModal(); flash('Merged'); } catch (err) { console.warn(err); b.disabled = false; flash(`Merge failed (${(err && err.code) || err})`); } return; }
   if (act === 'removeplayer') { const p = S.players[b.dataset.uid]; if (!p) return; if (!b.dataset.armed) { b.dataset.armed = '1'; b.textContent = `delete ${p.name} for good? tap again`; setTimeout(() => { b.dataset.armed = ''; b.textContent = 'remove'; }, 4000); return; }
-    b.disabled = true; try { for (const id of Object.keys(S.lines)) if (S.lines[id].uid === p.id) await S.store.remove('lines', id); await S.store.remove('players', p.id); flash(`Removed ${p.name}`); } catch (e) { console.warn(e); b.disabled = false; b.dataset.armed = ''; b.textContent = 'remove'; commishFail(e); } return; }
+    b.disabled = true;
+    try { await S.store.update('players', p.id, { removed: true, active: false, updatedAt: nowISO() }); }   // soft-remove first: hides them everywhere
+    catch (e) { console.warn(e); b.disabled = false; b.dataset.armed = ''; b.textContent = 'remove'; commishFail(e); return; }
+    try { for (const id of Object.keys(S.lines)) if (S.lines[id].uid === p.id) await S.store.remove('lines', id); await S.store.remove('players', p.id); } catch (e) { console.warn('hard delete refused, player stays hidden', e && e.code); }
+    flash(`Removed ${p.name}`); return; }
   if (act === 'toggleactive') { const p = S.players[b.dataset.uid]; if (!p) return; const drop = p.active !== false; b.disabled = true;
     try { await S.store.update('players', p.id, { active: !drop, updatedAt: nowISO() }); if (p.id === S.uid) S.me.active = !drop; flash(drop ? `${p.name} dropped from the standings` : `${p.name} restored`); } catch (e) { console.warn(e); b.disabled = false; commishFail(e); } return; }
   if (act === 'savefix' && g) { const val = k => { const i = document.querySelector(`[data-fix="${k}"][data-gid="${g.id}"]`); const v = i && i.value.trim(); return v === '' ? null : Number(v); }; const o = { homeScore: val('home'), awayScore: val('away'), close: val('close'), at: nowISO() }; if ((o.homeScore == null) !== (o.awayScore == null)) { flash('Enter both scores, or neither'); return; } await S.store.set('overrides', g.id, o); flash('Saved'); return; }
@@ -381,7 +385,8 @@ async function mergePlayers(from, to) {
   const src = S.players[from], dst = S.players[to]; if (!src || !dst) throw new Error('player missing');
   for (const [id, d] of Object.entries(S.lines)) { if (d.uid !== from) continue; const target = `${to}_${d.wk}`; if (!S.lines[target]) { const copy = { ...d, uid: to }; delete copy.id; await S.store.set('lines', target, copy); } await S.store.remove('lines', id); }
   if (!dst.orderUpdatedAt && src.orderUpdatedAt) await S.store.update('players', to, { order: src.order, orderUpdatedAt: src.orderUpdatedAt, updatedAt: nowISO() });
-  await S.store.remove('players', from);
+  await S.store.update('players', from, { removed: true, active: false, updatedAt: nowISO() });
+  try { await S.store.remove('players', from); } catch (e) { console.warn('hard delete refused, player stays hidden', e && e.code); }
 }
 async function joinRoom(name) {
   if (S.players[S.uid]) { location.hash = 'home'; render(); return; }   // already a player on this device: never overwrite
