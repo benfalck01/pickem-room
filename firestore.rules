@@ -1,28 +1,28 @@
 rules_version = '2';
-// Pick'em Room security rules. Paste into Firebase console → Firestore Database → Rules → Publish.
-// Everyone who opens the link is signed in anonymously (no account). Each player can only write their own
-// player document and their own lines. The commissioner (the first person to open the page) can write everything.
+// Pick'em Room security rules. Paste into Firebase console → Firestore Database → Rules (replace EVERYTHING) → Publish.
+// Everyone who opens the link is signed in anonymously (no account). Each player can only write their own player document
+// and their own lines. The commissioner (the first person to open the page, or anyone signed in with the commissioner's
+// Google email) can write everything.
 service cloud.firestore {
-  match /databases/{db}/documents {
+  match /databases/{database}/documents {
     function signedIn() { return request.auth != null; }
+    function cfg() { return get(/databases/$(database)/documents/config/app).data; }
     function isCommish() {
-      return signedIn() && exists(/databases/$(db)/documents/config/app)
-        && get(/databases/$(db)/documents/config/app).data.commissionerUid == request.auth.uid;
+      return signedIn() && exists(/databases/$(database)/documents/config/app) && (
+        cfg().commissionerUid == request.auth.uid
+        || ('email' in request.auth.token && 'commissionerEmail' in cfg() && request.auth.token.email == cfg().commissionerEmail)
+      );
     }
-
     match /config/app {
       allow read: if signedIn();
-      // first visitor claims the commissioner seat; after that only the commissioner may change config
       allow create: if signedIn() && request.resource.data.commissionerUid == request.auth.uid;
       allow update: if isCommish();
     }
-
     match /players/{uid} {
       allow read: if signedIn();
       allow create, update: if signedIn() && (request.auth.uid == uid || isCommish());
       allow delete: if isCommish();
     }
-
     match /lines/{docId} {
       allow read: if signedIn();
       allow create, update: if signedIn() && (
@@ -30,15 +30,11 @@ service cloud.firestore {
         || isCommish());
       allow delete: if isCommish();
     }
-
-    // the book's closing line, written once by whichever phone first sees it after kickoff
     match /book/{gameId} {
       allow read: if signedIn();
       allow create: if signedIn();
       allow update, delete: if isCommish();
     }
-
-    // commissioner corrections (scores, closing lines)
     match /overrides/{gameId} {
       allow read: if signedIn();
       allow write: if isCommish();

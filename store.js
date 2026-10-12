@@ -62,7 +62,7 @@ class FirebaseStore {
       const stop = auth.onAuthStateChanged(this.auth, u => { if (u) { stop(); resolve(u); } }, reject);
       auth.signInAnonymously(this.auth).catch(reject);
     });
-    this.uid = user.uid; this.isAnonymous = user.isAnonymous;
+    this.uid = user.uid; this.isAnonymous = user.isAnonymous; this.email = user.email || null;
   }
   subscribe(coll, cb, onError) {
     const { collection, onSnapshot } = this.F;

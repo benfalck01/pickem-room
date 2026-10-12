@@ -1,8 +1,8 @@
 // Pick'em Room — app logic (phone-first, shared live state).
-import { scoreLine, bookSelfScore, RULES, HOW_TO_PLAY } from './scoring.js?v=202610122159';
-import { TEAMS, T, ALL, DIVS, WEEK_KEYS, weekLabel, weekShort, nextWeekKey, prevWeekKey, fetchCurrent, fetchWeek, fetchBook, clearCache, records, recStr, standingsOrder } from './nfl.js?v=202610122159';
-import { createStore } from './store.js?v=202610122159';
-import { FIREBASE_CONFIG } from './firebase-config.js?v=202610122159';
+import { scoreLine, bookSelfScore, RULES, HOW_TO_PLAY } from './scoring.js?v=202610122211';
+import { TEAMS, T, ALL, DIVS, WEEK_KEYS, weekLabel, weekShort, nextWeekKey, prevWeekKey, fetchCurrent, fetchWeek, fetchBook, clearCache, records, recStr, standingsOrder } from './nfl.js?v=202610122211';
+import { createStore } from './store.js?v=202610122211';
+import { FIREBASE_CONFIG } from './firebase-config.js?v=202610122211';
 
 /* ================= state ================= */
 const S = { store: null, uid: null, config: null, players: {}, lines: {}, book: {}, overrides: {}, games: {}, current: { key: null, year: null }, week: null, viewWeek: null, me: null, myLines: {}, screen: 'home', ready: false, netErr: null, cmpWho: null, showAllRanks: false, rankMode: 'div', bookTried: new Set() };
@@ -93,7 +93,10 @@ async function fetchBooks() {
     try { const b = await fetchBook(g.id); if (b && b.close != null) { await S.store.set('book', g.id, { close: b.close, open: b.open, at: nowISO() }); } else S.bookTried.delete(g.id); } catch (e) { S.bookTried.delete(g.id); }
   }
 }
-function afterData() { if (S.ready) { if (S.config && S.config.weekOverride && S.config.weekOverride !== S.week) settleWeek().then(scheduleRender); scheduleRender(); } }
+function afterData() {
+  // once the commissioner is signed in with Google, record the email so any device with that Google account has the controls
+  if (S.config && isCommish() && S.store.email && S.config.commissionerEmail !== S.store.email && !S.emailWriteTried) { S.emailWriteTried = true; S.store.update('config', 'app', { commissionerEmail: S.store.email, updatedAt: nowISO() }).catch(e => console.warn('commissionerEmail not saved yet', e && e.code)); }
+  if (S.ready) { if (S.config && S.config.weekOverride && S.config.weekOverride !== S.week) settleWeek().then(scheduleRender); scheduleRender(); } }
 
 /* ================= my data (local-authoritative, written with a debounce) ================= */
 let adoptedMe = false; const adoptedWeeks = new Set();
